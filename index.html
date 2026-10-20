@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>CM 01/02</title>
-<meta name="description" content="CM0102, the classic PC football management game, running offline on iPad.">
+<meta name="description" content="CM0102, the classic PC football management game, running offline on iPad and iPhone.">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#050608">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -116,6 +116,32 @@ canvas.boxedwine-webgl-canvas { pointer-events: none; z-index: 1; }
   #tools:not(.open) > :not(#t-handle) { display: none; }
   #tools.open #t-handle { min-height: 22px !important; width: 52px !important; }
 }
+/* ===== Zoom and pan =====
+   The game draws at a fixed 800x600. On a phone that fits into ~370px of height,
+   which makes CM's text ~7px tall, so the frame can be scaled up and panned.
+   Emscripten maps taps through getBoundingClientRect(), which follows the transform. */
+#dropzone { overflow: hidden; }
+div.emscripten_border { transform-origin: 50% 50%; }
+#view-pip { display: none; }
+
+/* ===== Phones (iPhone in landscape) =====
+   The tool rail moves into the right-hand safe area (beside the rounded corner /
+   Dynamic Island), so it never sits on top of the game. */
+body.phone #dropzone { padding-left: env(safe-area-inset-left, 0px); padding-right: max(50px, env(safe-area-inset-right, 0px)); }
+body.phone #tools { top: 0; bottom: 0; right: 0; transform: none; width: max(50px, env(safe-area-inset-right, 0px)); padding: 0 0 env(safe-area-inset-bottom, 0px); box-sizing: border-box; justify-content: center; align-items: center; gap: 4px; background: #000; }
+body.phone #tools #t-handle { display: none !important; }
+body.phone #tools:not(.open) > :not(#t-handle) { display: grid; }
+body.phone #tools button { width: 44px; min-height: 40px; font-size: 10px; padding: 3px 1px; gap: 1px; }
+body.phone #tools button svg { width: 18px; height: 18px; }
+body.phone #tools .mips { display: none !important; }
+body.phone #view-pip { display: block; position: absolute; z-index: 4; left: calc(env(safe-area-inset-left, 0px) + 6px); bottom: calc(env(safe-area-inset-bottom, 0px) + 6px); width: 64px; height: 48px; border: 1px solid rgba(255,255,255,.35); background: rgba(0,0,0,.45); pointer-events: none; opacity: 0; transition: opacity .3s; }
+body.phone #view-pip.show { opacity: 1; transition: none; }
+body.phone #view-pip i { position: absolute; border: 1.5px solid var(--yellow); box-sizing: border-box; }
+#rotate { display: none; }
+@media (orientation: portrait) {
+  body.phone #stage.on #rotate { display: grid; position: absolute; inset: 0; z-index: 20; place-items: center; align-content: center; gap: 14px; background: #050608; color: #e8ebff; font-family: var(--display); font-size: 22px; text-align: center; padding: 24px; }
+  #rotate svg { width: 64px; height: 64px; stroke: var(--yellow); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+}
 #kbd { position: absolute; left: 0; bottom: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; font-size: 16px; border: 0; padding: 0; }
 
 #boot { position: absolute; z-index: 4; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100% - 32px)); background: rgba(5, 8, 40, .92); border: 1px solid var(--navy-2); padding: 18px 20px; display: grid; gap: 10px; }
@@ -145,7 +171,7 @@ canvas.boxedwine-webgl-canvas { pointer-events: none; z-index: 1; }
         <a class="coffee" href="https://www.creativeandskint.com/buymeacoffee" target="_blank" rel="noopener">☕ Buy me a coffee</a>
         <p class="tiny">Totally optional. Just a cheers.</p>
         <h3 class="sub">How to save</h3>
-        <p>Save in the game as normal, then give it a few seconds. A yellow box with a tick pops up at the bottom once the save is stored on this iPad.</p>
+        <p>Save in the game as normal, then give it a few seconds. A yellow box with a tick pops up at the bottom once the save is stored on this device.</p>
         <p>Don't close the app until you've seen it. Not sure? Tap Check on the side panel.</p>
       </div>
     </aside>
@@ -172,7 +198,7 @@ canvas.boxedwine-webgl-canvas { pointer-events: none; z-index: 1; }
             <div class="label"><b id="engine-name">Fast for iPad</b><span id="engine-note"></span></div>
           </div>
           <div class="row" id="cap-row">
-            <div class="label"><b>Recycle at</b><span id="cap-note">How much compiled code the iPad engine can build up before it clears it out and starts afresh. It rarely gets near this now.</span></div>
+            <div class="label"><b>Recycle at</b><span id="cap-note">How much compiled code the engine can build up before it clears it out and starts afresh. It rarely gets near this now.</span></div>
             <div class="seg" role="group" aria-label="Code memory limit">
               <button type="button" id="cap-300" aria-pressed="false">300 MB</button>
               <button type="button" id="cap-500" aria-pressed="false">500 MB</button>
@@ -181,7 +207,7 @@ canvas.boxedwine-webgl-canvas { pointer-events: none; z-index: 1; }
           </div>
         </div>
         <div class="section" id="device-saves-card" hidden>
-          <h2>Saves on this iPad</h2>
+          <h2>Saves on this device</h2>
           <p class="fine">Send gives you the file to keep in Files, AirDrop to a mate, or back up. Your mate brings it in below.</p>
           <div class="saves" id="device-saves"></div>
         </div>
@@ -194,7 +220,7 @@ canvas.boxedwine-webgl-canvas { pointer-events: none; z-index: 1; }
         <div class="section">
           <h2>Bring in a save or tactic</h2>
           <div class="row">
-            <div class="label"><b>From Files</b><span>A save (.sav) or tactic (.tct), or a zip of them. AirDrop them to the iPad first.</span></div>
+            <div class="label"><b>From Files</b><span>A save (.sav) or tactic (.tct), or a zip of them. AirDrop them to this device first.</span></div>
             <button class="btn" type="button" id="l-import">Choose file</button>
           </div>
           <input type="file" id="l-file" accept=".sav,.tct,.zip,application/zip,application/octet-stream" multiple hidden>
@@ -234,6 +260,8 @@ canvas.boxedwine-webgl-canvas { pointer-events: none; z-index: 1; }
       <canvas class="emscripten boxedwine-webgl-canvas" id="boxedwine-webgl-canvas-0" oncontextmenu="event.preventDefault()"></canvas>
     </div>
   </div>
+  <div id="view-pip" aria-hidden="true"><i></i></div>
+  <div id="rotate"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M3 14a9 9 0 0 0 6 7.5M5.5 19.5L9 21.5l.5-3.5"/></svg>Turn your phone sideways to play</div>
   <div id="boot">
     <b id="boot-title">Starting Windows</b>
     <p id="boot-text">The game window appears when Windows has started. The first run on a new device takes longest.</p>
@@ -242,9 +270,10 @@ canvas.boxedwine-webgl-canvas { pointer-events: none; z-index: 1; }
   <div id="tools" hidden>
     <button type="button" id="t-handle" aria-label="Show tools" aria-expanded="false">‹</button>
     <button type="button" id="t-home" title="Back to the launcher"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>Home</button>
-    <button type="button" id="t-check" title="Make sure your saves are stored on this iPad"><svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 13l3 3 5-6"/></svg>Check</button>
+    <button type="button" id="t-check" title="Make sure your saves are stored on this device"><svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 13l3 3 5-6"/></svg>Check</button>
     <button type="button" id="t-kbd" title="Keyboard"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M7 14h10"/></svg>Keys</button>
     <button type="button" id="t-rc" aria-pressed="false" title="Next tap is a right-click"><svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 3v7M12 10h6"/></svg>Right</button>
+    <button type="button" id="t-view" title="Change the view: whole screen, fill the width, or closer"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M8 10.5h5M10.5 8v5"/></svg><span id="t-view-label">View</span></button>
     <button type="button" id="t-fs" title="Full screen"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Full</button>
     <div class="mips" id="mips" title="Emulated speed, millions of instructions per second">–<br>MIPS</div>
   </div>
@@ -252,7 +281,7 @@ canvas.boxedwine-webgl-canvas { pointer-events: none; z-index: 1; }
   <div id="drawer" hidden>
     <div class="box">
       <h2>Saves</h2>
-      <p class="fine">Back up copies every save in the game folder into one zip. Import takes a .sav file, or a zip made by Back up. Save in the game before you back up, and wait for the “saved to this iPad” tick before closing the app. An imported save appears after you close and reopen the app.</p>
+      <p class="fine">Back up copies every save in the game folder into one zip. Import takes a .sav file, or a zip made by Back up. Save in the game before you back up, and wait for the “saved” tick before closing the app. An imported save appears after you close and reopen the app.</p>
       <div class="row"><button class="btn" type="button" id="d-backup">Back up saves</button><button class="btn" type="button" id="d-import">Import a save</button></div>
       <input type="file" id="d-file" accept=".sav,.zip" hidden>
       <div class="status" id="d-status"></div>
@@ -336,7 +365,7 @@ window.fetch = function (input, init) {
    Only the iPad engine ships now: the original Standard and Fast builds were
    either too slow or ran out of memory, and both stranded saves (see jitr/README). */
 const ENGINES = {
-  jitr: ["Fast for iPad", "Compiles CM's code in small pieces as it runs, which keeps memory low, and clears it out if it ever passes the limit below. Works on iPad and desktop."],
+  jitr: ["Fast for iPad and iPhone", "Compiles CM's code in small pieces as it runs, which keeps memory low, and clears it out if it ever passes the limit below. Works on iPad and desktop."],
 };
 const engine = "jitr";
 function renderEngine() {
@@ -472,7 +501,7 @@ async function chooseVersion(v) {
     $("db-status").textContent = "Downloading 3.9.68 (18 MB)…";
     try { const r = await fetch(V3968_URL); if (!r.ok) throw new Error("download failed (" + r.status + ")"); await r.arrayBuffer(); }
     catch (e) { $("db-status").textContent = "Couldn't get 3.9.68: " + (e.message || e) + ". Try again when you're online."; return; }
-    $("db-status").textContent = "3.9.68 is on this iPad. It switches when you kick off. Start a new game to use it.";
+    $("db-status").textContent = "3.9.68 is on this device. It switches when you kick off. Start a new game to use it.";
     ls.set(WANT_VER_KEY, "3.9.68");
   } else {
     try { localStorage.removeItem(WANT_VER_KEY); } catch (e) {}
@@ -818,6 +847,8 @@ function onWindowShown() {
   $("boot-text").textContent = "The game is loading its database. The red title screen comes next.";
   setTimeout(() => { $("boot").hidden = true; clearInterval(bootTimer); }, 6000);
   $("tools").hidden = false;
+  view.relayout();
+  if (isPhone() && !ls.get("cm-view-hint", "")) { ls.set("cm-view-hint", "1"); setTimeout(() => toast("Pinch to zoom, drag with two fingers to move around. View switches between whole screen and wide.", 6000), 7500); }
   if (installedNow) setTimeout(() => toast(installedNow + " is ready under Restore Saved Game", 4500), 7000);
   if (dbNow) setTimeout(() => toast("Now on " + dbNow + ". Start a new game to use it.", 5000), 4000);
   if (installedTactics) setTimeout(() => toast("New tactics ready under Tactics, Load: " + installedTactics, 5000), installedNow ? 12500 : 7000);
@@ -1033,7 +1064,7 @@ function sayResult(r, quiet) {
   if (r.kept) { if (!quiet) toast("✓ " + r.name + " saved (backup copy) · " + clock(r.mtime), 4000); return; }
   if (Date.now() - (lastWarn[r.file] || 0) < 30000) return;
   lastWarn[r.file] = Date.now();
-  toast("⚠ " + r.name + " is NOT stored on this iPad yet. Retrying. Don't close the app.", 9000);
+  toast("⚠ " + r.name + " is NOT stored on this device yet. Retrying. Don't close the app.", 9000);
 }
 function watchSaves() {
   const st = { tempSince: 0, tempSig: "", hadTemp: false, prev: {}, logged: {}, ignore: null };
@@ -1100,12 +1131,102 @@ async function checkSaves() {
     const newest = results.slice().sort((a, b) => b.mtime - a.mtime)[0];
     saveLog("check: " + results.map(r => r.file + (r.stored ? " ok" : r.kept ? " backup only" : " NOT stored")).join(", "));
     if (bad.length) { lastWarn = {}; sayResult(bad[0]); }
-    else toast("✓ All saves stored on this iPad. Newest: " + newest.name + ", written " + clock(newest.mtime) + ".", 6000);
+    else toast("✓ All saves stored on this device. Newest: " + newest.name + ", written " + clock(newest.mtime) + ".", 6000);
   } finally { saveBusy = false; }
 }
 document.addEventListener("visibilitychange", () => { if (document.hidden && gameShown) syncNow("app hidden"); });
 window.addEventListener("pagehide", () => { if (gameShown) syncNow("app closed"); });
 
+
+/* ===== Phone layout ===== */
+const PHONE_MQ = window.matchMedia("(orientation: landscape) and (max-height: 520px), (orientation: portrait) and (max-width: 520px)");
+function setPhone() { document.body.classList.toggle("phone", PHONE_MQ.matches); }
+setPhone();
+(PHONE_MQ.addEventListener ? PHONE_MQ.addEventListener("change", setPhone) : PHONE_MQ.addListener(setPhone));
+const isPhone = () => document.body.classList.contains("phone");
+// Phones have less memory than iPads: start the code recycler lower there.
+if (isPhone() && ls.get("cm-jit-recycle", null) === null) { capMB = 300; renderCap(); }
+// Element full screen doesn't exist on iPhone; the home-screen app is already full screen.
+if (!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)) $("t-fs").hidden = true;
+
+/* ===== View: zoom and pan =====
+   s is the scale on top of the "whole screen" fit (1 = whole game visible).
+   "Wide" fills the screen in its long direction; "Close" goes in further.
+   Two fingers: pinch to zoom, drag to move around. When the view can't move any
+   further that way, the drag scrolls the game instead (as it always did). */
+const view = (function () {
+  const zone = $("dropzone"), frame = document.querySelector("div.emscripten_border");
+  let s = 1, tx = 0, ty = 0, rel = null, pipTimer = 0;
+  function content() {
+    const cs = getComputedStyle(zone), r = zone.getBoundingClientRect();
+    const l = parseFloat(cs.paddingLeft) || 0, rt = parseFloat(cs.paddingRight) || 0, t = parseFloat(cs.paddingTop) || 0, b = parseFloat(cs.paddingBottom) || 0;
+    return { cx: r.left + l + (r.width - l - rt) / 2, cy: r.top + t + (r.height - t - b) / 2, w: r.width - l - rt, h: r.height - t - b };
+  }
+  const base = () => ({ w: frame.offsetWidth, h: frame.offsetHeight });
+  function fill() { const c = content(), f = base(); return f.w && f.h ? Math.max(1, c.w / f.w, c.h / f.h) : 1; }
+  const maxS = () => Math.max(2.5, fill() * 1.6);
+  function limits() { const c = content(), f = base(); return { x: Math.max(0, (f.w * s - c.w) / 2), y: Math.max(0, (f.h * s - c.h) / 2) }; }
+  function clamp() { const m = limits(); tx = Math.min(m.x, Math.max(-m.x, tx)); ty = Math.min(m.y, Math.max(-m.y, ty)); }
+  function apply(showPip) {
+    clamp();
+    frame.style.transform = (s === 1 && !tx && !ty) ? "" : "translate(" + tx.toFixed(1) + "px," + ty.toFixed(1) + "px) scale(" + s.toFixed(4) + ")";
+    const F = fill();
+    const name = s <= 1.01 ? "Fit" : Math.abs(s - F) < 0.02 * F ? "Wide" : "Zoom";
+    $("t-view-label").textContent = name;
+    if (showPip) pip();
+  }
+  // Small map in the corner showing which part of the game is on screen.
+  function pip() {
+    const el = $("view-pip"), box = el.firstElementChild, c = content(), f = base();
+    if (s <= 1.01 || !f.w) { el.classList.remove("show"); return; }
+    const vw = Math.min(1, c.w / (f.w * s)), vh = Math.min(1, c.h / (f.h * s));
+    const m = limits();
+    const px = m.x ? (m.x - tx) / (2 * m.x) : 0, py = m.y ? (m.y - ty) / (2 * m.y) : 0;
+    box.style.width = (vw * 100) + "%"; box.style.height = (vh * 100) + "%";
+    box.style.left = (px * (1 - vw) * 100) + "%"; box.style.top = (py * (1 - vh) * 100) + "%";
+    el.classList.add("show"); clearTimeout(pipTimer); pipTimer = setTimeout(() => el.classList.remove("show"), 1200);
+  }
+  // Scale about a screen point, keeping the game pixel under it in place.
+  function zoomAt(newS, px, py) {
+    newS = Math.min(maxS(), Math.max(1, newS));
+    const c = content();
+    const ux = (px - c.cx - tx) / s, uy = (py - c.cy - ty) / s;
+    s = newS; tx = px - c.cx - ux * s; ty = py - c.cy - uy * s;
+    rel = s / fill(); remember(); apply(true);
+  }
+  // Move by (dx, dy); returns whatever part of the move the view couldn't take.
+  function pan(dx, dy) {
+    const wx = tx + dx, wy = ty + dy; tx = wx; ty = wy; clamp();
+    const left = { x: wx - tx, y: wy - ty };
+    if (left.x !== dx || left.y !== dy) { apply(true); remember(); }
+    return left;
+  }
+  function remember() { if (rel !== null) ls.set("cm-view-rel", rel.toFixed(3)); ls.set("cm-view-pos", tx.toFixed(0) + "," + ty.toFixed(0)); }
+  // Preset: show the top of the game (CM's menu bar) when zooming in from a button.
+  function preset(newS) { s = Math.min(maxS(), Math.max(1, newS)); rel = s / fill(); tx = limits().x; ty = limits().y; apply(true); remember(); }
+  function cycle() {
+    const F = fill(), name = $("t-view-label").textContent;
+    if (name === "Fit") preset(F > 1.02 ? F : 1.6);
+    else if (name === "Wide" && F > 1.02) preset(F * 1.35);
+    else preset(1);
+  }
+  // Re-fit when the screen size changes (rotation, toolbar, keyboard).
+  function relayout() {
+    if (!frame.offsetWidth) return;
+    if (rel === null) {
+      const saved = parseFloat(ls.get("cm-view-rel", ""));
+      rel = isFinite(saved) ? saved : (isPhone() ? 1 : 1 / fill());
+      const pos = (ls.get("cm-view-pos", "") || "").split(",").map(Number);
+      s = Math.min(maxS(), Math.max(1, rel * fill()));
+      if (pos.length === 2 && pos.every(isFinite)) { tx = pos[0]; ty = pos[1]; } else { tx = limits().x; ty = limits().y; }
+    } else s = Math.min(maxS(), Math.max(1, rel * fill()));
+    apply(false);
+  }
+  if (window.ResizeObserver) new ResizeObserver(relayout).observe(zone);
+  window.addEventListener("resize", () => requestAnimationFrame(relayout));
+  $("t-view").onclick = cycle;
+  return { zoomAt, pan, relayout, get scale() { return s; } };
+})();
 
 /* ===== Touch, keyboard ===== */
 const SETTLE_MS = 160, HOLD_MS = 100;
@@ -1113,6 +1234,7 @@ const SETTLE_MS = 160, HOLD_MS = 100;
   const zone = $("dropzone");
   let rightNext = false, start = null, dragging = false, dragBtn = 0, rdrag = false, holdTimer = 0, lastPinch = null, consumed = false;
   const target = () => $("canvas");
+  const two = (a, b) => ({ x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2, d: Math.max(1, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)) });
   function send(type, x, y, button, buttons) {
     const ev = new MouseEvent(type, { clientX: x, clientY: y, screenX: x, screenY: y, button, buttons, bubbles: true, cancelable: true, view: window });
     target().dispatchEvent(ev);
@@ -1134,7 +1256,7 @@ const SETTLE_MS = 160, HOLD_MS = 100;
   const opts = { capture: true, passive: false };
   zone.addEventListener("touchstart", e => {
     e.preventDefault(); e.stopPropagation();
-    if (e.touches.length === 2) { clearTimeout(holdTimer); const a = e.touches[0], b = e.touches[1]; lastPinch = (a.clientY + b.clientY) / 2; consumed = true; if (dragging || rdrag) { send("mouseup", start.x, start.y, rdrag ? 2 : dragBtn, 0); dragging = false; rdrag = false; } return; }
+    if (e.touches.length === 2) { clearTimeout(holdTimer); const a = e.touches[0], b = e.touches[1]; lastPinch = two(a, b); lastPinch.d0 = lastPinch.d; lastPinch.m0 = { x: lastPinch.x, y: lastPinch.y }; lastPinch.mode = null; lastPinch.acc = 0; consumed = true; if (dragging || rdrag) { send("mouseup", start.x, start.y, rdrag ? 2 : dragBtn, 0); dragging = false; rdrag = false; } return; }
     if (e.touches.length > 2) return;
     const t = e.changedTouches[0]; start = { x: t.clientX, y: t.clientY, time: Date.now() }; dragging = false; rdrag = false; consumed = false;
     moveTo(t.clientX, t.clientY);
@@ -1145,7 +1267,22 @@ const SETTLE_MS = 160, HOLD_MS = 100;
   }, opts);
   zone.addEventListener("touchmove", e => {
     e.preventDefault(); e.stopPropagation();
-    if (e.touches.length === 2 && lastPinch !== null) { const a = e.touches[0], b = e.touches[1]; const y = (a.clientY + b.clientY) / 2; const dy = lastPinch - y; if (Math.abs(dy) > 12) { wheel(dy > 0 ? 100 : -100, a.clientX, y); lastPinch = y; } return; }
+    if (e.touches.length === 2 && lastPinch !== null) {
+      const now = two(e.touches[0], e.touches[1]), g = lastPinch;
+      // Decide once per gesture: a pinch zooms; a drag moves the view, then scrolls the game.
+      if (!g.mode) {
+        if (Math.abs(now.d / g.d0 - 1) > 0.12) g.mode = "zoom";
+        else if (Math.hypot(now.x - g.m0.x, now.y - g.m0.y) > 8) g.mode = "drag";
+      }
+      if (g.mode === "zoom") { view.zoomAt(view.scale * now.d / g.d, now.x, now.y); view.pan(now.x - g.x, now.y - g.y); }
+      else if (g.mode === "drag") {
+        const left = view.pan(now.x - g.x, now.y - g.y);
+        g.acc -= left.y;
+        if (Math.abs(g.acc) > 12) { wheel(g.acc > 0 ? 100 : -100, now.x, now.y); g.acc = 0; }
+      }
+      g.x = now.x; g.y = now.y; g.d = now.d;
+      return;
+    }
     if (!start) return;
     const t = e.changedTouches[0];
     if (rdrag) { send("mousemove", t.clientX, t.clientY, 0, 2); return; }
