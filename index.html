@@ -614,10 +614,40 @@ refreshStatus();
 })();
 
 
-// Hand a save or tactic out of the app: the share sheet on iPad (Save to Files,
-// AirDrop, WhatsApp), a download elsewhere. Read straight from storage, so it
-// works from the launcher without starting the game.
+// Hand a file out of the app: the share sheet on iPhone and iPad (Save to Files,
+// AirDrop, WhatsApp), a download elsewhere. Safari only opens the share sheet
+// straight after a tap; reading or zipping a big save can take longer than that
+// and Safari then refuses ("Permission denied"). So when that happens the button
+// keeps the ready file and the next tap shares it at once.
+function shareNow(file) {
+  if (navigator.canShare && navigator.canShare({ files: [file] })) return navigator.share({ files: [file], title: file.name });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = file.name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 60000);
+  return Promise.resolve("downloaded");
+}
+// Returns "shared", "downloaded" or "held" (waiting for another tap).
+async function shareFromTap(file, btn, label) {
+  try { return (await shareNow(file)) || "shared"; }
+  catch (e) {
+    if (!(e && e.name === "NotAllowedError")) throw e;
+    btn._ready = file; btn._label = label; btn.disabled = false; btn.textContent = "Tap again to share";
+    return "held";
+  }
+}
+// The second tap: share the file that's already in hand, before anything else.
+function shareHeld(btn) {
+  const file = btn._ready; if (!file) return null;
+  btn._ready = null; const label = btn._label;
+  const p = shareNow(file);
+  btn.textContent = label;
+  return p;
+}
+
+// Saves and tactics on the launcher. Read straight from storage, so it works
+// without starting the game.
 async function sendStoredFile(f, btn) {
+  const held = shareHeld(btn);
+  if (held) { try { await held; } catch (e) { if (!(e && e.name === "AbortError")) alertLine("Couldn't send " + f.file + ": " + (e.message || e)); } return; }
   const label = btn.textContent; btn.disabled = true; btn.textContent = "Getting it…";
   try {
     const db = await new Promise((res, rej) => { const r = indexedDB.open("/root/app/cm0102.zip"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
@@ -625,12 +655,7 @@ async function sendStoredFile(f, btn) {
     db.close();
     if (!rec || !rec.contents) throw new Error("couldn't read it from storage");
     const file = new File([rec.contents], f.file, { type: "application/octet-stream" });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: f.file });
-    } else {
-      const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = f.file; document.body.appendChild(a); a.click();
-      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 60000);
-    }
+    if (await shareFromTap(file, btn, label) === "held") { alertLine(f.file + " is ready. Tap “Tap again to share”."); return; }
   } catch (e) { if (!(e && e.name === "AbortError")) alertLine("Couldn't send " + f.file + ": " + (e.message || e)); }
   btn.disabled = false; btn.textContent = label;
 }
@@ -764,23 +789,25 @@ for (const id of ["t-kbd", "t-fs", "t-home", "t-check"]) $(id).addEventListener(
 $("d-close").onclick = () => { $("drawer").hidden = true; };
 function listSaves() { try { return FS.readdir(gameDir()).filter(n => /\.sav$/i.test(n)); } catch (e) { return []; } }
 $("d-backup").onclick = async () => {
+  const btn = $("d-backup");
+  const held = shareHeld(btn);
+  if (held) {
+    try { const r = await held; $("d-status").textContent = r === "downloaded" ? "Backup downloaded." : "Backup ready. Choose Save to Files to keep it."; }
+    catch (e) { $("d-status").textContent = e && e.name === "AbortError" ? "Backup cancelled." : "Backup failed: " + (e.message || e); }
+    return;
+  }
   const names = listSaves();
   if (!names.length) { $("d-status").textContent = "No saves in the game folder yet. Save from inside the game first."; return; }
   $("d-status").textContent = "Zipping " + names.length + " save" + (names.length > 1 ? "s" : "") + "…";
+  const label = btn.textContent;
   try {
     const z = await fflate(); const files = {};
     for (const n of names) files[n] = FS.readFile(gameDir() + "/" + n);
     const data = await new Promise((res, rej) => z.zip(files, { level: 6 }, (err, out) => err ? rej(err) : res(out)));
     const d = new Date(); const stamp = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
     const file = new File([data], "cm0102-saves-" + stamp + ".zip", { type: "application/zip" });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: file.name });
-      $("d-status").textContent = "Backup ready. Choose Save to Files to keep it.";
-    } else {
-      const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = file.name; document.body.appendChild(a); a.click();
-      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 60000);
-      $("d-status").textContent = "Backup downloaded.";
-    }
+    const r = await shareFromTap(file, btn, label);
+    $("d-status").textContent = r === "held" ? "Backup ready. Tap “Tap again to share”." : r === "downloaded" ? "Backup downloaded." : "Backup ready. Choose Save to Files to keep it.";
   } catch (e) { $("d-status").textContent = e && e.name === "AbortError" ? "Backup cancelled." : "Backup failed: " + (e.message || e); }
 };
 $("d-import").onclick = () => $("d-file").click();
