@@ -619,35 +619,45 @@ refreshStatus();
 // straight after a tap; reading or zipping a big save can take longer than that
 // and Safari then refuses ("Permission denied"). So when that happens the button
 // keeps the ready file and the next tap shares it at once.
-function shareNow(file) {
-  if (navigator.canShare && navigator.canShare({ files: [file] })) return navigator.share({ files: [file], title: file.name });
+function downloadFile(file) {
   const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = file.name; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 60000);
-  return Promise.resolve("downloaded");
+  return "downloaded";
 }
+// The share sheet is for phones and tablets. On a computer a download is simpler,
+// and Chrome and Edge refuse to share file types they don't know (like .sav) anyway.
+function wantsShareSheet(file) {
+  return !!(navigator.canShare && navigator.canShare({ files: [file] }) && window.matchMedia("(pointer: coarse)").matches);
+}
+function shareNow(file) {
+  if (!wantsShareSheet(file)) return Promise.resolve(downloadFile(file));
+  return navigator.share({ files: [file], title: file.name }).then(() => "shared");
+}
+const refused = e => e && e.name === "NotAllowedError";
 // Returns "shared", "downloaded" or "held" (waiting for another tap).
 async function shareFromTap(file, btn, label) {
-  try { return (await shareNow(file)) || "shared"; }
+  try { return await shareNow(file); }
   catch (e) {
-    if (!(e && e.name === "NotAllowedError")) throw e;
+    if (!refused(e)) throw e;
+    // Still within the tap, so it wasn't the timing: the browser won't share this file. Download it.
+    if (navigator.userActivation && navigator.userActivation.isActive) return downloadFile(file);
     btn._ready = file; btn._label = label; btn.disabled = false; btn.textContent = "Tap again to share";
     return "held";
   }
 }
 // The second tap: share the file that's already in hand, before anything else.
+// If the browser still refuses, it's the file type, so download it instead.
 function shareHeld(btn) {
   const file = btn._ready; if (!file) return null;
-  btn._ready = null; const label = btn._label;
-  const p = shareNow(file);
-  btn.textContent = label;
-  return p;
+  btn._ready = null; btn.textContent = btn._label;
+  return shareNow(file).catch(e => { if (refused(e)) return downloadFile(file); throw e; });
 }
 
 // Saves and tactics on the launcher. Read straight from storage, so it works
 // without starting the game.
 async function sendStoredFile(f, btn) {
   const held = shareHeld(btn);
-  if (held) { try { await held; } catch (e) { if (!(e && e.name === "AbortError")) alertLine("Couldn't send " + f.file + ": " + (e.message || e)); } return; }
+  if (held) { try { await held; alertLine(""); } catch (e) { if (!(e && e.name === "AbortError")) alertLine("Couldn't send " + f.file + ": " + (e.message || e)); } return; }
   const label = btn.textContent; btn.disabled = true; btn.textContent = "Getting it…";
   try {
     const db = await new Promise((res, rej) => { const r = indexedDB.open("/root/app/cm0102.zip"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
